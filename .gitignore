@@ -1,0 +1,56 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+server/node_modules
+
+# Production Build
+dist
+dist-ssr
+*.local
+
+# Environment Variables (NEVER commit these)
+.env
+.env.local
+.env.production
+server/.env
+
+# Database files (use MongoDB Atlas in production)
+*.sqlite
+*.sqlite3
+*.db
+server/database.sqlite
+
+# Logs
+server/server.log
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Test files
+test_users_api.js
+server/test_*.cjs
+server/inspect_db.cjs
+server/manage_db.cjs
+server/seed_db.cjs
+server/get_creds.cjs
+
+# Hardhat / Blockchain build
+artifacts
+cache
+contracts/artifacts

@@ -1,0 +1,6 @@
+@echo off
+echo Starting SkillXchange...
+echo Initializing Backend Server...
+cd server
+node index.js
+pause

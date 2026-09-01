@@ -1,0 +1,316 @@
+/* Premium Matchmaking UI */
+
+.matchmaking-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 3rem 2rem;
+  padding-bottom: 6rem;
+  min-height: 100vh;
+}
+
+.matchmaking-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  height: 60vh;
+  color: var(--text-primary);
+  font-size: 1.25rem;
+  font-weight: 600;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.matchmaking-loading svg {
+  color: var(--brand-primary);
+  width: 48px;
+  height: 48px;
+}
+
+.matchmaking-hero {
+  text-align: center;
+  margin-bottom: 4rem;
+  position: relative;
+}
+
+.matchmaking-hero::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(31, 122, 90, 0.15) 0%, rgba(255,255,255,0) 70%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.matchmaking-hero h1 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  font-size: 3rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, var(--text-primary) 30%, var(--brand-primary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.02em;
+}
+
+.matchmaking-hero p {
+  color: var(--text-secondary);
+  font-size: 1.25rem;
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.match-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 2.5rem;
+}
+
+.no-matches {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6rem 2rem;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.5) 100%);
+  border: 1px dashed var(--border-glass);
+  border-radius: 24px;
+}
+
+.match-card {
+  position: relative;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 24px;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0,0,0,0.02);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+.match-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 20px 40px -15px rgba(31, 122, 90, 0.15), 0 0 0 1px rgba(31, 122, 90, 0.1);
+}
+
+.match-score-badge {
+  position: absolute;
+  top: -18px;
+  right: 2rem;
+  background: linear-gradient(135deg, #10B981, #059669);
+  color: white;
+  padding: 0.6rem 1.25rem;
+  border-radius: 100px;
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  box-shadow: 0 8px 16px -4px rgba(16, 185, 129, 0.4);
+  z-index: 2;
+  transition: transform 0.3s ease;
+}
+
+.match-card:hover .match-score-badge {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.score-value {
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.score-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.95;
+}
+
+.match-card-header {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.match-avatar-wrapper {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid white;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  position: relative;
+}
+
+.match-avatar-wrapper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.match-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.match-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+  color: var(--text-muted);
+}
+
+.match-user-info h3 {
+  margin: 0 0 0.35rem 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.match-user-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.match-user-meta span {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.match-reason-box {
+  background: linear-gradient(to right, rgba(16, 185, 129, 0.05), rgba(16, 185, 129, 0.02));
+  border-left: 3px solid var(--brand-primary);
+  border-radius: 0 12px 12px 0;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+
+.match-reason-box p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.match-skills {
+  margin-bottom: 2rem;
+  flex: 1;
+}
+
+.match-skills h4 {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 0 0 1rem 0;
+}
+
+.skill-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.skill-tag {
+  background: white;
+  border: 1px solid rgba(0,0,0,0.06);
+  color: var(--text-primary);
+  padding: 0.4rem 1rem;
+  border-radius: 100px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  transition: all 0.2s ease;
+}
+
+.skill-tag:hover {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  transform: translateY(-1px);
+}
+
+.skill-tag-more {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  padding: 0.4rem 0.8rem;
+  border-radius: 100px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.match-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 1rem;
+  margin-top: auto;
+}
+
+.match-actions button {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.match-actions .btn-primary {
+  box-shadow: 0 4px 12px rgba(31, 122, 90, 0.2);
+}
+
+.match-actions .btn-primary:hover {
+  box-shadow: 0 6px 16px rgba(31, 122, 90, 0.3);
+  transform: translateY(-2px);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .matchmaking-hero h1 {
+    font-size: 2.25rem;
+  }
+  
+  .match-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .match-card {
+    padding: 1.5rem;
+  }
+}
+

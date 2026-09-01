@@ -1,0 +1,280 @@
+.portfolio-page {
+  padding: 2rem 0 4rem;
+}
+
+.portfolio-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.portfolio-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 2.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.portfolio-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.portfolio-certificate {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #FFFFFF;
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 3rem;
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+.portfolio-certificate::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 6px;
+  background: linear-gradient(to right, #6366f1, #ec4899, #f59e0b);
+}
+
+.cert-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-glass);
+}
+
+.cert-logo {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.cert-verified {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--success);
+  margin-top: 0.25rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cert-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 3px solid rgba(99, 102, 241, 0.4);
+}
+
+.cert-avatar-placeholder {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  border: 3px solid rgba(99, 102, 241, 0.4);
+}
+
+.cert-body {
+  margin-bottom: 3rem;
+}
+
+.cert-name {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.cert-bio {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  margin-bottom: 2.5rem;
+}
+
+.cert-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.cert-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1.5rem;
+  background: #F8FAFC;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-glass);
+}
+
+.cert-stat .stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.cert-stat .stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.cert-skills-section h3, .cert-achievements h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.cert-skills-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 2.5rem;
+}
+
+.cert-skill-badge {
+  display: flex;
+  align-items: center;
+  background: #F8FAFC;
+  border: 1px solid var(--border-glass);
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.cert-skill-badge .skill-name {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.cert-skill-badge .skill-level {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  background: #E5E7EB;
+  color: var(--text-primary);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.level-expert { color: #fbbf24; }
+.level-advanced { color: #34d399; }
+.level-intermediate { color: #60a5fa; }
+.level-beginner { color: #94a3b8; }
+
+.achievement-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.achievement-list li {
+  position: relative;
+  padding-left: 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.achievement-list li::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  color: var(--brand-primary);
+}
+
+.cert-footer {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--border-glass);
+  padding-top: 1.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+/* Print styles for export */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .navbar, .portfolio-actions, .portfolio-header h1, .portfolio-header p, .ai-mentor-btn, .ai-mentor-window {
+    display: none !important;
+  }
+  .portfolio-page {
+    padding: 0 !important;
+  }
+  .portfolio-certificate {
+    box-shadow: none !important;
+    border: 2px solid #e2e8f0 !important;
+    background: white !important;
+    color: black !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+  .cert-name, .cert-skills-section h3, .cert-achievements h3, .cert-stat .stat-value, .cert-bio {
+    color: black !important;
+  }
+  .cert-stat {
+    border: 1px solid #cbd5e1 !important;
+    background: #f8fafc !important;
+  }
+  .cert-stat .stat-label {
+    color: #475569 !important;
+  }
+  .cert-skill-badge {
+    border: 1px solid #cbd5e1 !important;
+  }
+  .cert-skill-badge .skill-name {
+    color: #0f172a !important;
+  }
+  .cert-skill-badge .skill-level {
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+  }
+  .achievement-list li {
+    color: #334155 !important;
+  }
+  .cert-footer {
+    color: #64748b !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .cert-stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .portfolio-certificate {
+    padding: 1.5rem;
+  }
+}
