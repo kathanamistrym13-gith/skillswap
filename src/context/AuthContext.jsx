@@ -6,6 +6,25 @@ const AuthContext = createContext(null);
 
 const API_URL = '/api';
 
+// Always returns a human-readable error string, never [object Object]
+const extractError = (err, fallback = 'Something went wrong. Please try again.') => {
+  if (!err) return fallback;
+  // Axios error with response body
+  if (err.response?.data?.error && typeof err.response.data.error === 'string') {
+    return err.response.data.error;
+  }
+  if (err.response?.data?.message && typeof err.response.data.message === 'string') {
+    return err.response.data.message;
+  }
+  if (typeof err.response?.data === 'string' && err.response.data.length > 0) {
+    return err.response.data;
+  }
+  // Network error (no response)
+  if (err.message && typeof err.message === 'string') return err.message;
+  if (typeof err === 'string') return err;
+  return fallback;
+};
+
 const getSocketUrl = () => {
   if (import.meta.env.VITE_SOCKET_URL) {
     return import.meta.env.VITE_SOCKET_URL;
@@ -81,11 +100,7 @@ export const AuthProvider = ({ children }) => {
       
       return userData;
     } catch (err) {
-      const msg = err.response?.data?.error
-        || (typeof err.response?.data === 'string' ? err.response.data : null)
-        || err.message
-        || 'Login failed';
-      throw new Error(msg);
+      throw new Error(extractError(err, 'Login failed'));
     }
   };
 
@@ -103,11 +118,7 @@ export const AuthProvider = ({ children }) => {
       
       return userData;
     } catch (err) {
-      const msg = err.response?.data?.error
-        || (typeof err.response?.data === 'string' ? err.response.data : null)
-        || err.message
-        || 'Signup failed';
-      throw new Error(msg);
+      throw new Error(extractError(err, 'Signup failed'));
     }
   };
 

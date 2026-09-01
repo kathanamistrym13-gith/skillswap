@@ -29,7 +29,12 @@ export default function Login() {
       await login(email, password);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message);
+      const msg = typeof err === 'string'
+        ? err
+        : err?.message && typeof err.message === 'string'
+          ? err.message
+          : 'Something went wrong. Please try again.';
+      setError(msg);
     } finally {
       setIsLoading(false);
     }

@@ -35,7 +35,12 @@ export default function Register() {
       await signup(name, email, password);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message);
+      const msg = typeof err === 'string'
+        ? err
+        : err?.message && typeof err.message === 'string'
+          ? err.message
+          : 'Something went wrong. Please try again.';
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
