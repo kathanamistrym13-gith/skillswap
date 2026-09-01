@@ -16,12 +16,19 @@ const app = express();
 
 // --- DB CONNECTION MIDDLEWARE ---
 app.use(async (req, res, next) => {
+  // Only gate API routes that need the DB
+  if (!req.path.startsWith('/api/') || req.path === '/api/health') {
+    return next();
+  }
   try {
     await connectDB();
+    next();
   } catch (err) {
-    console.error('Database connection error in request:', err.message);
+    console.error('Database connection error:', err.message);
+    return res.status(503).json({
+      error: 'Database unavailable. Please check MONGODB_URI environment variable. Error: ' + err.message
+    });
   }
-  next();
 });
 
 // --- MIDDLEWARE ---
