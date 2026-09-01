@@ -81,7 +81,11 @@ export const AuthProvider = ({ children }) => {
       
       return userData;
     } catch (err) {
-      throw new Error(err.response?.data?.error || 'Login failed');
+      const msg = err.response?.data?.error
+        || (typeof err.response?.data === 'string' ? err.response.data : null)
+        || err.message
+        || 'Login failed';
+      throw new Error(msg);
     }
   };
 
@@ -99,7 +103,11 @@ export const AuthProvider = ({ children }) => {
       
       return userData;
     } catch (err) {
-      throw new Error(err.response?.data?.error || 'Signup failed');
+      const msg = err.response?.data?.error
+        || (typeof err.response?.data === 'string' ? err.response.data : null)
+        || err.message
+        || 'Signup failed';
+      throw new Error(msg);
     }
   };
 
