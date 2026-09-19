@@ -54,3 +54,5 @@ server/get_creds.cjs
 artifacts
 cache
 contracts/artifacts
+
+.vercel

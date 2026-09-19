@@ -23,7 +23,6 @@ export default function Messages() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [otherUser, setOtherUser] = useState(null);
-  const [incomingCall, setIncomingCall] = useState(null);
   const [showNotetakerModal, setShowNotetakerModal] = useState(false);
   
   // Sync activeChatId with URL parameters
@@ -112,10 +111,6 @@ export default function Messages() {
       });
     };
     
-    const handleIncomingCall = (data) => {
-      setIncomingCall(data);
-    };
-
     const handleTyping = (data) => {
       if (data.senderId === activeChatId) setIsTyping(true);
     };
@@ -126,7 +121,6 @@ export default function Messages() {
 
     socket.on('receive_message', handleReceiveMessage);
     socket.on('message_sent', handleReceiveMessage);
-    socket.on('incoming_call', handleIncomingCall);
     socket.on('typing', handleTyping);
     socket.on('stop_typing', handleStopTyping);
 
@@ -141,7 +135,6 @@ export default function Messages() {
     return () => {
       socket.off('receive_message', handleReceiveMessage);
       socket.off('message_sent', handleReceiveMessage);
-      socket.off('incoming_call', handleIncomingCall);
       socket.off('typing', handleTyping);
       socket.off('stop_typing', handleStopTyping);
       document.removeEventListener('mousedown', handleClickOutside);
@@ -236,14 +229,8 @@ export default function Messages() {
     navigate(`/call/${activeChatId}`);
   };
   
-  const acceptCall = () => {
-    if (incomingCall) {
-      navigate(`/call/${incomingCall.from}`, { state: { incomingSignal: incomingCall.signal } });
-    }
-  };
-
   const rejectCall = () => {
-    setIncomingCall(null);
+    // handled globally by IncomingCallOverlay
   };
 
   const formatTime = (timestamp) => {
@@ -252,17 +239,6 @@ export default function Messages() {
 
   return (
     <div className="messages-layout container">
-      {/* Incoming Call Overlay */}
-      {incomingCall && (
-        <div className="incoming-call-overlay glass-panel" style={{position: 'absolute', top: '10%', right: '10%', zIndex: 100, padding: '2rem', textAlign: 'center', background: 'rgba(31,23,18,0.95)', border: '1px solid var(--brand-primary)', borderRadius: 'var(--radius-lg)'}}>
-          <h3 style={{marginBottom: '1rem'}}>Incoming Video Call</h3>
-          <div style={{display: 'flex', gap: '1rem'}}>
-             <button onClick={acceptCall} className="btn-primary" style={{background: 'var(--success)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)'}}>Accept</button>
-             <button onClick={rejectCall} className="btn-secondary" style={{background: 'var(--error)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', color: 'white'}}>Reject</button>
-          </div>
-        </div>
-      )}
-
       {/* Sidebar: Conversations List */}
       <div className={`conversations-sidebar glass-panel ${activeChatId ? 'hide-on-mobile' : ''}`}>
         <div className="sidebar-header">

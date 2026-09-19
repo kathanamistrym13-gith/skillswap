@@ -2,13 +2,15 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
+const uuidv4 = () => crypto.randomUUID();
 const connectDB = require('./db');
 const User = require('./models/User');
 const Skill = require('./models/Skill');
 const Message = require('./models/Message');
 const SwapRequest = require('./models/SwapRequest');
 const SessionNote = require('./models/SessionNote');
+const Call = require('./models/Call');
 const { rankUserMatches } = require('./aiMatcher');
 const { simulatePracticePartner, analyzeCareerSkillGap, generateSessionSummary } = require('./aiSuperchargers');
 
@@ -16,8 +18,8 @@ const app = express();
 
 // --- DB CONNECTION MIDDLEWARE ---
 app.use(async (req, res, next) => {
-  // Only gate API routes that need the DB
-  if (!req.path.startsWith('/api/') || req.path === '/api/health') {
+  // Skip DB connection only for simple health check
+  if (req.path === '/health' || req.path === '/api/health' || req.url === '/health' || req.url === '/api/health') {
     return next();
   }
   try {
@@ -452,7 +454,7 @@ app.put('/api/swap-requests/:requestId/status', async (req, res) => {
   const { requestId } = req.params;
   const { status } = req.body;
 
-  if (!['accepted', 'rejected'].includes(status)) {
+  if (!['accepted', 'rejected', 'completed'].includes(status)) {
     return res.status(400).json({ error: 'Invalid status value' });
   }
 
@@ -864,6 +866,166 @@ app.get('/api/admin/data', async (req, res) => {
     const skills = await Skill.find();
     const messages = await Message.find().sort({ timestamp: -1 });
     res.json({ users, skills, messages });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- WEBRTC SIGNALING API (Vercel Serverless & Real-time Fallback) ---
+// 1. Initiate a call
+app.post('/api/call/initiate', async (req, res) => {
+  try {
+    const { from, to, callerName, signal, callId } = req.body;
+    if (!from || !to || !signal) {
+      return res.status(400).json({ error: 'Missing required call parameters' });
+    }
+
+    const id = callId || generateId();
+    // End any stale ringing calls for these users
+    await Call.updateMany(
+      { $or: [{ from: String(from), to: String(to) }, { from: String(to), to: String(from) }], status: 'ringing' },
+      { status: 'ended' }
+    );
+
+    const newCall = new Call({
+      id,
+      from: String(from),
+      to: String(to),
+      callerName: callerName || 'SkillSwap Partner',
+      offerSignal: signal,
+      status: 'ringing'
+    });
+    await newCall.save();
+
+    // Notify recipient via socket if connected
+    const io = app.getIO();
+    const connectedUsers = app.get('connectedUsers');
+    if (io && connectedUsers) {
+      const recipientSocketId = connectedUsers.get(String(to));
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit('incoming_call', {
+          callId: id,
+          signal,
+          from: String(from),
+          name: callerName || 'SkillSwap Partner'
+        });
+      }
+    }
+
+    res.json({ success: true, callId: id, call: newCall });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Check pending incoming call for a user
+app.get('/api/call/pending/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const sixtySecsAgo = new Date(Date.now() - 60000);
+    const call = await Call.findOne({
+      to: String(userId),
+      status: 'ringing',
+      createdAt: { $gte: sixtySecsAgo }
+    }).sort({ createdAt: -1 });
+
+    if (!call) {
+      return res.json({ call: null });
+    }
+
+    res.json({
+      call: {
+        callId: call.id,
+        from: call.from,
+        to: call.to,
+        callerName: call.callerName,
+        signal: call.offerSignal,
+        status: call.status
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Answer a call
+app.post('/api/call/answer', async (req, res) => {
+  try {
+    const { callId, answerSignal } = req.body;
+    if (!callId || !answerSignal) {
+      return res.status(400).json({ error: 'Missing callId or answerSignal' });
+    }
+
+    const call = await Call.findOne({ id: callId });
+    if (!call) {
+      return res.status(404).json({ error: 'Call not found' });
+    }
+
+    call.answerSignal = answerSignal;
+    call.status = 'connected';
+    await call.save();
+
+    // Notify caller via socket if connected
+    const io = app.getIO();
+    const connectedUsers = app.get('connectedUsers');
+    if (io && connectedUsers) {
+      const callerSocketId = connectedUsers.get(String(call.from));
+      if (callerSocketId) {
+        io.to(callerSocketId).emit('call_accepted', answerSignal);
+      }
+    }
+
+    res.json({ success: true, call });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Poll call status
+app.get('/api/call/status/:callId', async (req, res) => {
+  try {
+    const { callId } = req.params;
+    const call = await Call.findOne({ id: callId });
+    if (!call) {
+      return res.json({ status: 'ended' });
+    }
+    res.json({
+      status: call.status,
+      answerSignal: call.answerSignal,
+      offerSignal: call.offerSignal
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. End/Reject call
+app.post('/api/call/end', async (req, res) => {
+  try {
+    const { callId, userId } = req.body;
+    let call = null;
+    if (callId) {
+      call = await Call.findOne({ id: callId });
+      if (call) {
+        call.status = 'ended';
+        await call.save();
+      }
+    } else if (userId) {
+      await Call.updateMany(
+        { $or: [{ from: String(userId) }, { to: String(userId) }], status: { $in: ['ringing', 'connected'] } },
+        { status: 'ended' }
+      );
+    }
+
+    const io = app.getIO();
+    const connectedUsers = app.get('connectedUsers');
+    if (io && connectedUsers && call) {
+      const otherId = String(userId) === String(call.from) ? String(call.to) : String(call.from);
+      const otherSocket = connectedUsers.get(otherId);
+      if (otherSocket) io.to(otherSocket).emit('call_ended');
+    }
+
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

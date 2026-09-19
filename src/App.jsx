@@ -18,6 +18,7 @@ import Matchmaking from './pages/Matchmaking';
 import AiSimulator from './pages/AiSimulator';
 import CareerCopilot from './pages/CareerCopilot';
 import AiMentor from './components/AiMentor';
+import IncomingCallOverlay from './components/IncomingCallOverlay';
 import { useAuth } from './context/AuthContext';
 
 // Lazy load VideoCall to prevent simple-peer from crashing the initial bundle
@@ -120,6 +121,7 @@ function App() {
           </Suspense>
         </main>
         {user && <AiMentor />}
+        {user && <IncomingCallOverlay />}
       </div>
     </Router>
   );

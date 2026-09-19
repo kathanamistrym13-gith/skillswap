@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, X, ArrowRightLeft, Clock, CheckCircle2, XCircle, User, MessageSquare, Briefcase } from 'lucide-react';
+import { Check, X, ArrowRightLeft, Clock, CheckCircle2, XCircle, User, MessageSquare, Briefcase, Star } from 'lucide-react';
 import Button from './Button';
 import { useNavigate } from 'react-router-dom';
 import ReviewModal from './ReviewModal';

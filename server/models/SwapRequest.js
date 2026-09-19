@@ -8,7 +8,7 @@ const swapRequestSchema = new mongoose.Schema({
   wantedSkill: { type: String, required: true },
   status: { 
     type: String, 
-    enum: ['pending', 'accepted', 'rejected'], 
+    enum: ['pending', 'accepted', 'rejected', 'completed'], 
     default: 'pending' 
   },
   swapType: {

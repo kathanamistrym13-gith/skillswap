@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { PhoneOff, Mic, MicOff, Video as VideoIcon, VideoOff, StickyNote, X, PenTool, Sparkles } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Video as VideoIcon, VideoOff, StickyNote, X, PenTool, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Peer from 'simple-peer';
 import axios from 'axios';
@@ -20,13 +20,16 @@ export default function VideoCall() {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const connectionRef = useRef(null);
+  const activeCallIdRef = useRef(null);
+  const pollingIntervalRef = useRef(null);
   
   const [stream, setStream] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   
-  const [callStatus, setCallStatus] = useState('connecting'); 
+  const [callStatus, setCallStatus] = useState('connecting'); // 'connecting' | 'ringing' | 'connected' | 'ended'
   const [callAccepted, setCallAccepted] = useState(false);
+  const [pendingIncomingCall, setPendingIncomingCall] = useState(null);
 
   // Collaboration panel
   const [showNotes, setShowNotes] = useState(false);
@@ -38,19 +41,21 @@ export default function VideoCall() {
   const lastPosRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
-    if (!user || !socket) {
-      navigate('/messages');
+    if (!user) {
+      navigate('/login');
       return;
     }
 
     axios.get(`${API_URL}/users`)
       .then(res => {
-        const u = res.data.find(u => u.id === userId);
+        const u = res.data.find(u => String(u.id) === String(userId) || String(u._id) === String(userId));
         if (u) setTargetUser(u);
       })
       .catch(console.error);
 
-    let incomingSignal = location.state?.incomingSignal;
+    const incomingSignal = location.state?.incomingSignal;
+    const callId = location.state?.callId;
+    if (callId) activeCallIdRef.current = callId;
 
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       .then((currentStream) => {
@@ -60,47 +65,64 @@ export default function VideoCall() {
         }
 
         if (incomingSignal) {
-          answerCall(currentStream, incomingSignal);
+          answerCall(currentStream, incomingSignal, callId);
         } else {
-          initiateCall(currentStream);
+          // Check if there's an incoming call from this user waiting for us to answer
+          axios.get(`${API_URL}/call/pending/${user.id}`)
+            .then(res => {
+              if (res.data?.call && String(res.data.call.from) === String(userId)) {
+                setPendingIncomingCall(res.data.call);
+                setCallStatus('ringing');
+              } else {
+                initiateCall(currentStream);
+              }
+            })
+            .catch(() => {
+              initiateCall(currentStream);
+            });
         }
       })
       .catch((err) => {
-        console.error("Failed to get local stream", err);
-        alert("Camera/Microphone access needed for video calls.");
+        console.error("Failed to get local media stream", err);
+        alert("Camera/Microphone permission is required for video calls. Please enable it in browser settings.");
         navigate(`/messages/${userId}`);
       });
 
-    // Socket listeners for collaboration
-    socket.on('call_ended', () => {
-      endCall(false);
-    });
+    // Socket listeners when socket server is connected
+    if (socket) {
+      socket.on('call_ended', () => {
+        endCall(false);
+      });
 
-    socket.on('shared_notes_update', (data) => {
-      if (data.from !== user.id) {
-        setSharedNotes(data.content);
-      }
-    });
+      socket.on('shared_notes_update', (data) => {
+        if (data.from !== user.id) {
+          setSharedNotes(data.content);
+        }
+      });
 
-    socket.on('whiteboard_draw', (data) => {
-      if (data.from !== user.id) {
-        drawRemoteLine(data);
-      }
-    });
+      socket.on('whiteboard_draw', (data) => {
+        if (data.from !== user.id) {
+          drawRemoteLine(data);
+        }
+      });
 
-    socket.on('whiteboard_clear', (data) => {
-      if (data.from !== user.id) {
-        clearWhiteboardCanvas();
-      }
-    });
+      socket.on('whiteboard_clear', (data) => {
+        if (data.from !== user.id) {
+          clearWhiteboardCanvas();
+        }
+      });
+    }
 
     return () => {
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
       if (stream) stream.getTracks().forEach(track => track.stop());
       if (connectionRef.current) connectionRef.current.destroy();
-      socket.off('call_ended');
-      socket.off('shared_notes_update');
-      socket.off('whiteboard_draw');
-      socket.off('whiteboard_clear');
+      if (socket) {
+        socket.off('call_ended');
+        socket.off('shared_notes_update');
+        socket.off('whiteboard_draw');
+        socket.off('whiteboard_clear');
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -118,8 +140,41 @@ export default function VideoCall() {
     }
   }, [showWhiteboard]);
 
+  const startAnswerPolling = (peer, callId) => {
+    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+    let attempts = 0;
+    pollingIntervalRef.current = setInterval(async () => {
+      attempts++;
+      if (attempts > 50) { // 75 seconds timeout
+        clearInterval(pollingIntervalRef.current);
+        if (callStatus !== 'connected') {
+          setCallStatus('ended');
+        }
+        return;
+      }
+      try {
+        const res = await axios.get(`${API_URL}/call/status/${callId}`);
+        if (res.data?.status === 'connected' && res.data?.answerSignal) {
+          clearInterval(pollingIntervalRef.current);
+          setCallAccepted(true);
+          setCallStatus('connected');
+          try {
+            peer.signal(res.data.answerSignal);
+          } catch (e) {
+            console.error('Failed to apply answer signal:', e);
+          }
+        } else if (res.data?.status === 'ended' || res.data?.status === 'rejected') {
+          clearInterval(pollingIntervalRef.current);
+          setCallStatus('ended');
+        }
+      } catch {}
+    }, 1500);
+  };
+
   const initiateCall = (currentStream) => {
     setCallStatus('ringing');
+    const callId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+    activeCallIdRef.current = callId;
     
     const peer = new Peer({
       initiator: true,
@@ -128,13 +183,33 @@ export default function VideoCall() {
       config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
     });
 
-    peer.on('signal', (data) => {
-      socket.emit('call_user', {
-        userToCall: userId,
-        signalData: data,
-        from: user.id,
-        name: user.name
-      });
+    peer.on('signal', async (data) => {
+      // 1. Socket emission if connected
+      if (socket) {
+        socket.emit('call_user', {
+          userToCall: userId,
+          signalData: data,
+          from: user.id,
+          name: user.name,
+          callId
+        });
+      }
+
+      // 2. HTTP signaling (works seamlessly on Vercel)
+      try {
+        await axios.post(`${API_URL}/call/initiate`, {
+          callId,
+          from: user.id,
+          to: userId,
+          callerName: user.name,
+          signal: data
+        });
+      } catch (err) {
+        console.warn('HTTP call initiation fallback error:', err);
+      }
+
+      // Start polling for receiver's answer signal
+      startAnswerPolling(peer, callId);
     });
 
     peer.on('stream', (remoteStream) => {
@@ -144,24 +219,36 @@ export default function VideoCall() {
       }
     });
 
-    socket.on('call_accepted', (signal) => {
-      setCallAccepted(true);
-      setCallStatus('connected');
-      peer.signal(signal);
-    });
+    if (socket) {
+      socket.on('call_accepted', (signal) => {
+        if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+        setCallAccepted(true);
+        setCallStatus('connected');
+        try {
+          peer.signal(signal);
+        } catch (e) {
+          console.error('Peer signal accept error:', e);
+        }
+      });
 
-    socket.on('call_failed', () => {
-      setCallStatus('ended');
-      alert("User is offline or unavailable.");
-      endCall(false);
-    });
+      socket.on('call_failed', () => {
+        // Only mark ended if HTTP polling hasn't connected
+        if (callStatus !== 'connected') {
+          setCallStatus('ended');
+          alert("User is offline or unavailable.");
+          endCall(false);
+        }
+      });
+    }
 
     connectionRef.current = peer;
   };
 
-  const answerCall = (currentStream, incomingSignal) => {
+  const answerCall = (currentStream, incomingSignal, callId) => {
     setCallStatus('connected');
     setCallAccepted(true);
+    setPendingIncomingCall(null);
+    if (callId) activeCallIdRef.current = callId;
 
     const peer = new Peer({
       initiator: false,
@@ -170,8 +257,23 @@ export default function VideoCall() {
       config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
     });
 
-    peer.on('signal', (data) => {
-      socket.emit('answer_call', { signal: data, to: userId });
+    peer.on('signal', async (data) => {
+      // 1. Socket emission if available
+      if (socket) {
+        socket.emit('answer_call', { signal: data, to: userId });
+      }
+
+      // 2. HTTP signaling for Vercel
+      if (activeCallIdRef.current) {
+        try {
+          await axios.post(`${API_URL}/call/answer`, {
+            callId: activeCallIdRef.current,
+            answerSignal: data
+          });
+        } catch (err) {
+          console.warn('HTTP answer error:', err);
+        }
+      }
     });
 
     peer.on('stream', (remoteStream) => {
@@ -180,7 +282,12 @@ export default function VideoCall() {
       }
     });
 
-    peer.signal(incomingSignal);
+    try {
+      peer.signal(incomingSignal);
+    } catch (err) {
+      console.error('Failed to apply incoming signal to peer:', err);
+    }
+
     connectionRef.current = peer;
   };
 
@@ -202,16 +309,25 @@ export default function VideoCall() {
     }
   };
 
-  const endCall = (emit = true) => {
+  const endCall = async (emit = true) => {
     setCallStatus('ended');
+    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     if (stream) stream.getTracks().forEach(track => track.stop());
     if (connectionRef.current) connectionRef.current.destroy();
     
-    if (emit && socket) {
-      socket.emit('end_call', { to: userId });
+    if (emit) {
+      if (socket) {
+        socket.emit('end_call', { to: userId });
+      }
+      try {
+        await axios.post(`${API_URL}/call/end`, { 
+          callId: activeCallIdRef.current, 
+          userId: user?.id 
+        });
+      } catch {}
     }
     
-    setTimeout(() => navigate(`/messages/${userId}`), 1000);
+    setTimeout(() => navigate(`/messages/${userId}`), 800);
   };
 
   // --- Shared Notes ---
@@ -290,14 +406,40 @@ export default function VideoCall() {
       <div className={`video-main-area ${(showNotes || showWhiteboard) ? 'with-sidebar' : ''}`}>
         {/* Remote Video */}
         <div className="remote-video-container">
-          {callStatus === 'connecting' || callStatus === 'ringing' ? (
+          {pendingIncomingCall ? (
             <div className="calling-state">
               <div className="ripple-loader"><div></div><div></div></div>
-              <h2>{callStatus === 'ringing' ? `Ringing ${targetUser?.name}...` : 'Connecting...'}</h2>
+              <h2>{targetUser?.name || 'Partner'} is calling you!</h2>
+              <p className="text-muted text-sm mt-1">Click below to answer and start video exchange</p>
+              <button 
+                id="in-call-accept-btn"
+                className="btn btn-primary mt-4" 
+                style={{ 
+                  padding: '0.85rem 2.5rem', 
+                  fontSize: '1.15rem', 
+                  borderRadius: '30px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.6rem', 
+                  margin: '1.5rem auto 0',
+                  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                  boxShadow: '0 4px 25px rgba(34, 197, 94, 0.5)'
+                }}
+                onClick={() => answerCall(stream, pendingIncomingCall.signal, pendingIncomingCall.callId)}
+              >
+                <Phone size={22} /> Accept Call Now
+              </button>
+            </div>
+          ) : (callStatus === 'connecting' || callStatus === 'ringing') ? (
+            <div className="calling-state">
+              <div className="ripple-loader"><div></div><div></div></div>
+              <h2>{callStatus === 'ringing' ? `Ringing ${targetUser?.name || 'Partner'}...` : 'Connecting...'}</h2>
+              <p className="text-muted text-sm mt-2">Waiting for remote stream...</p>
             </div>
           ) : callStatus === 'ended' ? (
             <div className="call-ended-state">
               <h2>Call Ended</h2>
+              <p className="text-muted text-sm mt-1">Redirecting back to messages...</p>
             </div>
           ) : (
             <video 
@@ -310,7 +452,7 @@ export default function VideoCall() {
 
           {callStatus === 'connected' && callAccepted && (
             <div className="remote-user-overlay text-shadow">
-               <h3>{targetUser?.name}</h3>
+               <h3>{targetUser?.name || 'Partner'}</h3>
             </div>
           )}
         </div>
@@ -384,64 +526,57 @@ export default function VideoCall() {
         </div>
       </div>
 
-      {/* Collaboration Sidebar */}
+      {/* Sidebar: Collaborative Notes */}
       {showNotes && (
-        <div className="collab-sidebar glass-panel fade-in">
-          <div className="collab-header">
-            <h3><StickyNote size={16} /> Shared Notes</h3>
-            <button className="btn-close-collab" onClick={() => setShowNotes(false)}><X size={16} /></button>
+        <div className="collaboration-sidebar glass-panel">
+          <div className="sidebar-top-bar">
+            <h3>Shared Notes</h3>
+            <button className="btn-icon-close" onClick={() => setShowNotes(false)}>
+              <X size={18} />
+            </button>
           </div>
-          <textarea
-            className="collab-notes-area"
-            placeholder="Type shared notes here... Both participants can see and edit in real-time."
+          <p className="text-muted text-xs mb-2">Notes are synchronized in real-time between both callers.</p>
+          <textarea 
+            className="shared-textarea"
+            placeholder="Type meeting notes, code snippets, or exchange key points..."
             value={sharedNotes}
             onChange={handleNotesChange}
           />
         </div>
       )}
 
+      {/* Sidebar: Whiteboard Canvas */}
       {showWhiteboard && (
-        <div className="collab-sidebar glass-panel fade-in">
-          <div className="collab-header">
-            <h3><PenTool size={16} /> Whiteboard</h3>
-            <div className="collab-header-actions">
-              <button className="btn-clear-board" onClick={clearWhiteboard}>Clear</button>
-              <button className="btn-close-collab" onClick={() => setShowWhiteboard(false)}><X size={16} /></button>
+        <div className="collaboration-sidebar glass-panel whiteboard-panel">
+          <div className="sidebar-top-bar">
+            <h3>Live Whiteboard</h3>
+            <div className="whiteboard-actions">
+              <button className="btn-clear-canvas" onClick={clearWhiteboard}>Clear</button>
+              <button className="btn-icon-close" onClick={() => setShowWhiteboard(false)}>
+                <X size={18} />
+              </button>
             </div>
           </div>
-          <div className="whiteboard-wrapper">
-            <canvas
-              ref={whiteboardRef}
-              className="whiteboard-canvas"
-              onMouseDown={startDraw}
-              onMouseMove={draw}
-              onMouseUp={stopDraw}
-              onMouseLeave={stopDraw}
-            />
-          </div>
-          <p className="whiteboard-hint">Your strokes are <span style={{color:'#818cf8'}}>purple</span>, theirs are <span style={{color:'#f87171'}}>red</span>.</p>
+          <p className="text-muted text-xs mb-2">Draw or diagram collaboratively in real-time.</p>
+          <canvas 
+            ref={whiteboardRef}
+            className="whiteboard-canvas"
+            onMouseDown={startDraw}
+            onMouseMove={draw}
+            onMouseUp={stopDraw}
+            onMouseLeave={stopDraw}
+          />
         </div>
       )}
 
-      {/* AI Session Notetaker Modal */}
-      <SessionNotetakerModal
-        isOpen={showNotetakerModal}
-        onClose={() => setShowNotetakerModal(false)}
-        partnerId={userId}
-        partnerName={targetUser?.name || 'Peer Swapper'}
-        skillTopic="Peer Skill Exchange"
-        initialNotes={sharedNotes}
-        initialTranscript="Interactive WebRTC live peer learning session with shared notes and whiteboard."
-        onSendToChat={(text) => {
-          if (socket) {
-            socket.emit('send_message', {
-              senderId: user.id,
-              receiverId: userId,
-              text
-            });
-          }
-        }}
-      />
+      {/* AI Notetaker Modal */}
+      {showNotetakerModal && (
+        <SessionNotetakerModal
+          partnerId={userId}
+          partnerName={targetUser?.name || 'Partner'}
+          onClose={() => setShowNotetakerModal(false)}
+        />
+      )}
     </div>
   );
 }

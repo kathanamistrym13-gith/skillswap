@@ -40,14 +40,13 @@ Since Vercel runs serverless functions in the cloud, you need a cloud-hosted Mon
 | :--- | :--- | :--- |
 | `MONGODB_URI` | `mongodb+srv://<user>:<password>@cluster0.../skillswap` | Your MongoDB Atlas connection string |
 | `GEMINI_API_KEY` | `your_gemini_api_key` | Your Google Gemini API Key |
+| `VITE_SOCKET_URL` | `https://your-skillswap-server.onrender.com` | *(Optional)* Only needed for live video calls & real-time chat |
 
 6. Click **Deploy**! 🚀
 
 ---
 
 ### Option B: Deploy via Vercel CLI
-
-If you have the Vercel CLI installed:
 
 ```bash
 # 1. Install Vercel CLI globally (if not installed)
@@ -63,7 +62,10 @@ vercel
 vercel env add MONGODB_URI
 vercel env add GEMINI_API_KEY
 
-# 5. Deploy to Production
+# 5. (Optional) Set Socket URL for video calls
+vercel env add VITE_SOCKET_URL
+
+# 6. Deploy to Production
 vercel --prod
 ```
 
@@ -71,18 +73,45 @@ vercel --prod
 
 ## ⚙️ How the Architecture Works on Vercel
 
-- **Frontend (Vite / React)**: Built into static assets served via Vercel Edge CDN at lightning speeds.
-- **Backend API (`/api/*`)**: Handled by [api/index.js](file:///c:/Users/Kathan%20Mistry/Downloads/skillswap/api/index.js) running as high-performance Serverless Functions with Mongoose connection pooling.
-- **Routing**: [vercel.json](file:///c:/Users/Kathan%20Mistry/Downloads/skillswap/vercel.json) routes `/api/(.*)` to the serverless backend function and all other routes `/(.*)` to the React single page app (`index.html`).
+- **Frontend (Vite / React)**: Built into static assets served via Vercel Edge CDN.
+- **Backend API (`/api/*`)**: Handled by `api/index.js` running as a Serverless Function with a 30s timeout (for AI calls) and Mongoose connection pooling.
+- **Routing**: `vercel.json` routes `/api/(.*)` to the serverless backend and all other routes to the React SPA (`index.html`).
 
 ---
 
-## 📡 WebSockets & Video Calls Note
+## 📡 Video Calls & Real-Time Chat on Vercel
 
-- **REST APIs & AI Features**: All authentication, skills, swap requests, AI simulator, AI roadmap generator, career copilot, and session notetaker run smoothly on Vercel.
-- **Persistent WebSockets / Video Signaling**: Vercel serverless functions are ephemeral (stateless). For real-time WebRTC video calling and instant WebSocket push notifications across different devices in production:
-  - You can optionally deploy the `server/index.js` Node server to [Render](https://render.com) or [Railway](https://railway.app) (both offer free tiers).
-  - Then in Vercel's Environment Variables, set:
-    ```env
-    VITE_SOCKET_URL=https://your-server-name.onrender.com
-    ```
+> [!IMPORTANT]
+> Vercel Serverless Functions are **stateless and ephemeral** — they cannot maintain persistent WebSocket connections needed for WebRTC video call signaling and real-time chat.
+
+**What works on Vercel without extra setup:**
+- ✅ All REST APIs (auth, skills, swap requests, profiles)
+- ✅ All AI features (Simulator, Roadmaps, Career Copilot, Notetaker)
+- ✅ REST API message fallback (messages are saved to MongoDB)
+
+**What requires a dedicated socket server (`VITE_SOCKET_URL`):**
+- 📹 Video calling (WebRTC signaling via Socket.IO)
+- 💬 Real-time instant messaging (typing indicators, live push)
+- 🔔 Real-time notifications
+
+### Setting Up a Free Socket Server on Render
+
+1. Go to [render.com](https://render.com) and create a free account.
+2. Click **New Web Service** → connect your GitHub repo.
+3. Set:
+   - **Root Directory**: `server`
+   - **Build Command**: `npm install`
+   - **Start Command**: `node index.js`
+4. Add Environment Variables on Render:
+   - `MONGODB_URI` = your MongoDB Atlas URI
+   - `GEMINI_API_KEY` = your Gemini key
+   - `PORT` = `3001`
+5. Deploy. Copy the URL (e.g. `https://skillswap-server.onrender.com`).
+6. In your **Vercel** project settings → **Environment Variables**, add:
+   ```
+   VITE_SOCKET_URL = https://skillswap-server.onrender.com
+   ```
+7. **Redeploy** on Vercel for the variable to take effect.
+
+> [!TIP]
+> Render's free tier may spin down after inactivity. Use [UptimeRobot](https://uptimerobot.com) (free) to ping your Render URL every 5 minutes to keep it awake.

@@ -13,7 +13,7 @@ if (!cached) {
 const connectDB = async () => {
   const uri = process.env.MONGODB_URI || MONGODB_URI;
 
-  if (mongoose.connection.readyState >= 1) {
+  if (mongoose.connection.readyState === 1) {
     return mongoose.connection;
   }
 
@@ -23,11 +23,14 @@ const connectDB = async () => {
 
   if (!cached.promise) {
     const opts = {
-      bufferCommands: false,
+      bufferCommands: true,
+      serverSelectionTimeoutMS: 10000,
+      maxPoolSize: 10,
     };
 
     cached.promise = mongoose.connect(uri, opts).then((mongooseInstance) => {
       console.log('Connected to MongoDB');
+      cached.conn = mongooseInstance;
       return mongooseInstance;
     }).catch((err) => {
       console.error('MongoDB connection error:', err.message);
@@ -47,3 +50,4 @@ const connectDB = async () => {
 };
 
 module.exports = connectDB;
+

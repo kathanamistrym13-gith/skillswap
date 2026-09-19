@@ -1,0 +1,182 @@
+/* Global Incoming Call Overlay - shows on every page */
+.incoming-call-global-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 99999;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 2rem;
+  pointer-events: none;
+  animation: overlay-fade-in 0.3s ease;
+}
+
+@keyframes overlay-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.incoming-call-card {
+  pointer-events: all;
+  background: rgba(15, 10, 30, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(99, 102, 241, 0.5);
+  border-radius: 24px;
+  padding: 2rem 2rem 1.5rem;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 0 40px rgba(99, 102, 241, 0.3), 0 20px 60px rgba(0, 0, 0, 0.6);
+  animation: card-slide-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes card-slide-in {
+  from {
+    transform: translateY(-30px) scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Ring animation container */
+.call-ring-animation {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.25rem;
+}
+
+.call-avatar-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(99, 102, 241, 0.6);
+  animation: ring-pulse 2s ease-out infinite;
+}
+
+.call-avatar-ring.ring-1 {
+  width: 90px;
+  height: 90px;
+  animation-delay: 0s;
+}
+
+.call-avatar-ring.ring-2 {
+  width: 110px;
+  height: 110px;
+  animation-delay: 0.5s;
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.call-avatar-ring.ring-3 {
+  width: 130px;
+  height: 130px;
+  animation-delay: 1s;
+  border-color: rgba(99, 102, 241, 0.2);
+}
+
+@keyframes ring-pulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+
+.call-avatar-icon {
+  position: relative;
+  z-index: 2;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+}
+
+/* Call info text */
+.call-info {
+  text-align: center;
+}
+
+.call-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #a5b4fc;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.25rem;
+}
+
+.call-caller-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+/* Accept / Reject buttons */
+.call-action-buttons {
+  display: flex;
+  gap: 2rem;
+  margin-top: 0.5rem;
+}
+
+.call-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.call-btn:hover {
+  transform: scale(1.12);
+}
+
+.accept-btn {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  box-shadow: 0 4px 20px rgba(34, 197, 94, 0.4);
+  animation: accept-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes accept-pulse {
+  0%, 100% { box-shadow: 0 4px 20px rgba(34, 197, 94, 0.4); }
+  50% { box-shadow: 0 4px 30px rgba(34, 197, 94, 0.7); }
+}
+
+.accept-btn:hover {
+  box-shadow: 0 6px 25px rgba(34, 197, 94, 0.6);
+}
+
+.reject-btn {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.35);
+}
+
+.reject-btn:hover {
+  box-shadow: 0 6px 25px rgba(239, 68, 68, 0.55);
+}
+

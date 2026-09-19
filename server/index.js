@@ -35,7 +35,10 @@ io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
   socket.on('register', (userId) => {
-    connectedUsers.set(userId, socket.id);
+    if (userId) {
+      connectedUsers.set(String(userId), socket.id);
+      socket.userId = String(userId);
+    }
   });
 
   socket.on('send_message', async (data) => {
@@ -54,7 +57,7 @@ io.on('connection', (socket) => {
     try {
       await newMessage.save();
       const messagePayload = { id: msgId, senderId, receiverId, text, timestamp };
-      const receiverSocketId = connectedUsers.get(receiverId);
+      const receiverSocketId = connectedUsers.get(String(receiverId));
       if (receiverSocketId) io.to(receiverSocketId).emit('receive_message', messagePayload);
       socket.emit('message_sent', messagePayload);
     } catch (err) {
@@ -63,22 +66,45 @@ io.on('connection', (socket) => {
   });
 
   socket.on('call_user', (data) => {
-    const receiverSocketId = connectedUsers.get(data.userToCall);
+    const targetId = String(data.userToCall);
+    const receiverSocketId = connectedUsers.get(targetId);
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit('incoming_call', { signal: data.signalData, from: data.from });
+      io.to(receiverSocketId).emit('incoming_call', {
+        signal: data.signalData,
+        from: String(data.from),
+        name: data.name || 'SkillSwap Partner',
+        callId: data.callId
+      });
     } else {
-      socket.emit('call_failed', { reason: 'User is offline' });
+      socket.emit('call_failed', { reason: 'User is offline or unreachable' });
     }
   });
 
   socket.on('answer_call', (data) => {
-    const callerSocketId = connectedUsers.get(data.to);
-    if (callerSocketId) io.to(callerSocketId).emit('call_accepted', data.signal);
+    const callerSocketId = connectedUsers.get(String(data.to));
+    if (callerSocketId) {
+      io.to(callerSocketId).emit('call_accepted', data.signal);
+    }
   });
 
   socket.on('end_call', (data) => {
-    const otherSocketId = connectedUsers.get(data.to);
+    const otherSocketId = connectedUsers.get(String(data.to));
     if (otherSocketId) io.to(otherSocketId).emit('call_ended');
+  });
+
+  socket.on('shared_notes_update', (data) => {
+    const otherSocketId = connectedUsers.get(data.to);
+    if (otherSocketId) io.to(otherSocketId).emit('shared_notes_update', data);
+  });
+
+  socket.on('whiteboard_draw', (data) => {
+    const otherSocketId = connectedUsers.get(data.to);
+    if (otherSocketId) io.to(otherSocketId).emit('whiteboard_draw', data);
+  });
+
+  socket.on('whiteboard_clear', (data) => {
+    const otherSocketId = connectedUsers.get(data.to);
+    if (otherSocketId) io.to(otherSocketId).emit('whiteboard_clear', data);
   });
 
   socket.on('typing', (data) => {

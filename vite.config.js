@@ -17,7 +17,24 @@ export default defineConfig({
     },
   },
   define: {
+    // Required for simple-peer and other Node-style packages in the browser
     global: 'globalThis',
-    'process.env': {},
+  },
+  build: {
+    // Increase chunk size warning limit — simple-peer is large
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('simple-peer')) {
+            return 'simple-peer';
+          }
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/react-router-dom/')) {
+            return 'react-vendor';
+          }
+        },
+      },
+    },
   },
 });
+

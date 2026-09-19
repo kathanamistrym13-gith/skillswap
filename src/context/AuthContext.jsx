@@ -26,13 +26,20 @@ const extractError = (err, fallback = 'Something went wrong. Please try again.')
 };
 
 const getSocketUrl = () => {
+  // If an explicit socket server URL is configured (e.g. Render/Railway), use it
   if (import.meta.env.VITE_SOCKET_URL) {
     return import.meta.env.VITE_SOCKET_URL;
   }
-  if (typeof window !== 'undefined') {
+  // In local dev (Vite proxy is active), connect to origin
+  if (typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1'
+  )) {
     return window.location.origin;
   }
-  return '';
+  // On Vercel / serverless deployments without a dedicated socket server,
+  // skip the socket connection (real-time won't work, REST API still does)
+  return null;
 };
 
 const createSocket = (userId) => {
@@ -47,8 +54,12 @@ const createSocket = (userId) => {
       autoConnect: true
     });
 
+    if (newSocket.connected) {
+      newSocket.emit('register', String(userId));
+    }
+
     newSocket.on('connect', () => {
-      newSocket.emit('register', userId);
+      newSocket.emit('register', String(userId));
     });
 
     newSocket.on('connect_error', (err) => {
