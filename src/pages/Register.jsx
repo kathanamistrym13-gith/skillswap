@@ -140,7 +140,8 @@ export default function Register() {
             className="auth-submit-btn"
             isLoading={isLoading}
           >
-            Create Account <ArrowRight size={18} style={{ marginLeft: '4px' }} />
+            <span>Create Account</span>
+            <ArrowRight size={18} />
           </Button>
         </form>
 

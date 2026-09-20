@@ -120,7 +120,8 @@ export default function Login() {
             className="auth-submit-btn"
             isLoading={isLoading}
           >
-            Log In <ArrowRight size={18} style={{ marginLeft: '4px' }} />
+            <span>Log In</span>
+            <ArrowRight size={18} />
           </Button>
         </form>
 

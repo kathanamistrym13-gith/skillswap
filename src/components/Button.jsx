@@ -19,7 +19,7 @@ export default function Button({
       {...props}
     >
       {isLoading && <Loader2 className="spinner" size={18} />}
-      <span className={isLoading ? 'invisible' : ''}>{children}</span>
+      <span className={`btn-content ${isLoading ? 'invisible' : ''}`}>{children}</span>
     </button>
   );
 }

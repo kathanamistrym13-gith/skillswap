@@ -2,7 +2,6 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
   font-family: var(--font-family);
   font-weight: 600;
   border-radius: var(--radius-md);
@@ -14,6 +13,15 @@
   cursor: pointer;
   border: none;
   line-height: 1.2;
+}
+
+.btn-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  white-space: nowrap;
 }
 
 .btn:active:not(:disabled) {
