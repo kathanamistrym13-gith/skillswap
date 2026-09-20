@@ -11,6 +11,7 @@ const Message = require('./models/Message');
 const SwapRequest = require('./models/SwapRequest');
 const SessionNote = require('./models/SessionNote');
 const Call = require('./models/Call');
+const CallHistory = require('./models/CallHistory');
 const { rankUserMatches } = require('./aiMatcher');
 const { simulatePracticePartner, analyzeCareerSkillGap, generateSessionSummary } = require('./aiSuperchargers');
 
@@ -871,8 +872,88 @@ app.get('/api/admin/data', async (req, res) => {
   }
 });
 
-// --- WEBRTC SIGNALING API (Vercel Serverless & Real-time Fallback) ---
-// 1. Initiate a call
+// --- CALL HISTORY API & WEBRTC SIGNALING API ---
+
+// 1. Get user's call history
+app.get('/api/calls/history/:userId', async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const history = await CallHistory.find({
+      $or: [{ callerId: String(userId) }, { receiverId: String(userId) }]
+    }).sort({ timestamp: -1 }).limit(100);
+    res.json(history);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Get call history between two specific users (for direct chat timeline)
+app.get('/api/calls/history/:userId/:otherUserId', async (req, res) => {
+  const { userId, otherUserId } = req.params;
+  try {
+    const history = await CallHistory.find({
+      $or: [
+        { callerId: String(userId), receiverId: String(otherUserId) },
+        { callerId: String(otherUserId), receiverId: String(userId) }
+      ]
+    }).sort({ timestamp: 1 });
+    res.json(history);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Create or update call history record manually
+app.post('/api/calls/history', async (req, res) => {
+  const { callId, callerId, receiverId, callerName, receiverName, status, duration, callType, startedAt, endedAt } = req.body;
+  try {
+    let callRecord = null;
+    if (callId) {
+      callRecord = await CallHistory.findOne({ callId });
+    }
+    
+    if (callRecord) {
+      if (status) callRecord.status = status;
+      if (duration !== undefined && duration > 0) callRecord.duration = duration;
+      if (endedAt) callRecord.endedAt = endedAt;
+      if (callerName) callRecord.callerName = callerName;
+      if (receiverName) callRecord.receiverName = receiverName;
+      await callRecord.save();
+    } else {
+      const id = generateId();
+      callRecord = new CallHistory({
+        id,
+        callId: callId || id,
+        callerId: String(callerId),
+        receiverId: String(receiverId),
+        callerName: callerName || 'SkillSwap User',
+        receiverName: receiverName || 'SkillSwap User',
+        status: status || 'completed',
+        duration: duration || 0,
+        callType: callType || 'video',
+        startedAt: startedAt || Date.now(),
+        endedAt: endedAt || (duration ? new Date(Date.now()) : null),
+        timestamp: Date.now()
+      });
+      await callRecord.save();
+    }
+
+    const io = app.getIO();
+    const connectedUsers = app.get('connectedUsers');
+    if (io && connectedUsers) {
+      const receiverSocket = connectedUsers.get(String(callRecord.receiverId));
+      if (receiverSocket) io.to(receiverSocket).emit('call_history_updated', callRecord);
+      const callerSocket = connectedUsers.get(String(callRecord.callerId));
+      if (callerSocket) io.to(callerSocket).emit('call_history_updated', callRecord);
+    }
+
+    res.json(callRecord);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Initiate a call
 app.post('/api/call/initiate', async (req, res) => {
   try {
     const { from, to, callerName, signal, callId } = req.body;
@@ -897,6 +978,29 @@ app.post('/api/call/initiate', async (req, res) => {
     });
     await newCall.save();
 
+    // Also create or update persistent CallHistory entry (initial status 'missed' until answered)
+    try {
+      const existingHistory = await CallHistory.findOne({ callId: id });
+      if (!existingHistory) {
+        let receiverUser = await User.findOne({ id: String(to) }).select('name');
+        const historyEntry = new CallHistory({
+          id: generateId(),
+          callId: id,
+          callerId: String(from),
+          receiverId: String(to),
+          callerName: callerName || 'SkillSwap User',
+          receiverName: receiverUser?.name || 'SkillSwap User',
+          status: 'missed', // defaults to missed until answered
+          duration: 0,
+          startedAt: Date.now(),
+          timestamp: Date.now()
+        });
+        await historyEntry.save();
+      }
+    } catch (histErr) {
+      console.error('CallHistory initiate error:', histErr);
+    }
+
     // Notify recipient via socket if connected
     const io = app.getIO();
     const connectedUsers = app.get('connectedUsers');
@@ -918,7 +1022,7 @@ app.post('/api/call/initiate', async (req, res) => {
   }
 });
 
-// 2. Check pending incoming call for a user
+// 5. Check pending incoming call for a user
 app.get('/api/call/pending/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -948,7 +1052,7 @@ app.get('/api/call/pending/:userId', async (req, res) => {
   }
 });
 
-// 3. Answer a call
+// 6. Answer a call
 app.post('/api/call/answer', async (req, res) => {
   try {
     const { callId, answerSignal } = req.body;
@@ -964,6 +1068,16 @@ app.post('/api/call/answer', async (req, res) => {
     call.answerSignal = answerSignal;
     call.status = 'connected';
     await call.save();
+
+    // Update persistent call history to connected/completed
+    try {
+      await CallHistory.updateOne(
+        { callId },
+        { status: 'completed', startedAt: Date.now() }
+      );
+    } catch (hErr) {
+      console.error('CallHistory answer error:', hErr);
+    }
 
     // Notify caller via socket if connected
     const io = app.getIO();
@@ -981,7 +1095,7 @@ app.post('/api/call/answer', async (req, res) => {
   }
 });
 
-// 4. Poll call status
+// 7. Poll call status
 app.get('/api/call/status/:callId', async (req, res) => {
   try {
     const { callId } = req.params;
@@ -999,10 +1113,10 @@ app.get('/api/call/status/:callId', async (req, res) => {
   }
 });
 
-// 5. End/Reject call
+// 8. End/Reject call
 app.post('/api/call/end', async (req, res) => {
   try {
-    const { callId, userId } = req.body;
+    const { callId, userId, duration } = req.body;
     let call = null;
     if (callId) {
       call = await Call.findOne({ id: callId });
@@ -1010,6 +1124,21 @@ app.post('/api/call/end', async (req, res) => {
         call.status = 'ended';
         await call.save();
       }
+
+      // Update call history duration and ended status
+      try {
+        const hist = await CallHistory.findOne({ callId });
+        if (hist) {
+          if (duration !== undefined && duration > 0) {
+            hist.duration = duration;
+            hist.status = 'completed';
+          } else if (hist.status !== 'completed') {
+            hist.status = 'ended';
+          }
+          hist.endedAt = Date.now();
+          await hist.save();
+        }
+      } catch (hErr) {}
     } else if (userId) {
       await Call.updateMany(
         { $or: [{ from: String(userId) }, { to: String(userId) }], status: { $in: ['ringing', 'connected'] } },
@@ -1032,3 +1161,4 @@ app.post('/api/call/end', async (req, res) => {
 });
 
 module.exports = app;
+

@@ -23,6 +23,8 @@ export default function VideoCall() {
   const activeCallIdRef = useRef(null);
   const pollingIntervalRef = useRef(null);
   
+  const callStartTimeRef = useRef(null);
+  
   const [stream, setStream] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
@@ -158,6 +160,7 @@ export default function VideoCall() {
           clearInterval(pollingIntervalRef.current);
           setCallAccepted(true);
           setCallStatus('connected');
+          if (!callStartTimeRef.current) callStartTimeRef.current = Date.now();
           try {
             peer.signal(res.data.answerSignal);
           } catch (e) {
@@ -214,6 +217,7 @@ export default function VideoCall() {
 
     peer.on('stream', (remoteStream) => {
       setCallStatus('connected');
+      if (!callStartTimeRef.current) callStartTimeRef.current = Date.now();
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = remoteStream;
       }
@@ -224,6 +228,7 @@ export default function VideoCall() {
         if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
         setCallAccepted(true);
         setCallStatus('connected');
+        if (!callStartTimeRef.current) callStartTimeRef.current = Date.now();
         try {
           peer.signal(signal);
         } catch (e) {
@@ -248,6 +253,7 @@ export default function VideoCall() {
     setCallStatus('connected');
     setCallAccepted(true);
     setPendingIncomingCall(null);
+    if (!callStartTimeRef.current) callStartTimeRef.current = Date.now();
     if (callId) activeCallIdRef.current = callId;
 
     const peer = new Peer({
@@ -311,6 +317,8 @@ export default function VideoCall() {
 
   const endCall = async (emit = true) => {
     setCallStatus('ended');
+    const duration = callStartTimeRef.current ? Math.max(1, Math.round((Date.now() - callStartTimeRef.current) / 1000)) : 0;
+    
     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     if (stream) stream.getTracks().forEach(track => track.stop());
     if (connectionRef.current) connectionRef.current.destroy();
@@ -322,7 +330,24 @@ export default function VideoCall() {
       try {
         await axios.post(`${API_URL}/call/end`, { 
           callId: activeCallIdRef.current, 
-          userId: user?.id 
+          userId: user?.id,
+          duration
+        });
+      } catch {}
+    }
+
+    // Explicitly record/update persistent call history
+    if (activeCallIdRef.current) {
+      try {
+        await axios.post(`${API_URL}/calls/history`, {
+          callId: activeCallIdRef.current,
+          callerId: user?.id,
+          receiverId: userId,
+          callerName: user?.name,
+          receiverName: targetUser?.name || 'Partner',
+          status: duration > 0 ? 'completed' : 'ended',
+          duration,
+          endedAt: new Date().toISOString()
         });
       } catch {}
     }

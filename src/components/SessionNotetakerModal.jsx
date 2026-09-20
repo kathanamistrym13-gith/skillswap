@@ -5,6 +5,8 @@ import {
   Send, Code2, BookOpen, Clock, Award, Layers, Zap
 } from 'lucide-react';
 import axios from 'axios';
+import { useNotifications } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
 import Button from './Button';
 import './SessionNotetakerModal.css';
 
@@ -26,6 +28,8 @@ export default function SessionNotetakerModal({
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const { showToast } = useNotifications();
+  const { addXP } = useAuth();
 
   useEffect(() => {
     if (isOpen && !summaryData) {
@@ -53,11 +57,24 @@ export default function SessionNotetakerModal({
     }
   };
 
-  const toggleActionItem = (id) => {
+  const toggleActionItem = (id, taskText) => {
     setCompletedActions(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const isCompleting = !next.has(id);
+      if (isCompleting) {
+        next.add(id);
+        if (addXP) addXP(10, 'Completed Session Action Item');
+        if (showToast) {
+          showToast({
+            type: 'task',
+            title: '🎯 Action Item Completed!',
+            message: taskText || 'Session practice task marked complete!',
+            xp: 10
+          });
+        }
+      } else {
+        next.delete(id);
+      }
       return next;
     });
   };
@@ -218,7 +235,7 @@ ${summaryData.nextSessionAgenda?.map(n => `- ${n}`).join('\n')}
                       <div
                         key={action.id || idx}
                         className={`action-item-row ${isDone ? 'done' : ''}`}
-                        onClick={() => toggleActionItem(action.id)}
+                        onClick={() => toggleActionItem(action.id, action.task)}
                       >
                         <div className="action-item-check">
                           {isDone ? <CheckSquare size={18} className="text-success" /> : <Square size={18} className="text-muted" />}

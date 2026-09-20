@@ -3,6 +3,8 @@ import { Check, X, ArrowRightLeft, Clock, CheckCircle2, XCircle, User, MessageSq
 import Button from './Button';
 import { useNavigate } from 'react-router-dom';
 import ReviewModal from './ReviewModal';
+import { useNotifications } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
 import './SwapRequestsList.css';
 
 export default function SwapRequestsList({ requests = [], userId, onStatusUpdate }) {
@@ -10,6 +12,8 @@ export default function SwapRequestsList({ requests = [], userId, onStatusUpdate
   const [loadingId, setLoadingId] = useState(null);
   const [reviewData, setReviewData] = useState(null); // { req, partnerName }
   const navigate = useNavigate();
+  const { showToast, addNotification } = useNotifications();
+  const { addXP } = useAuth();
 
   const incomingRequests = requests.filter(r => r.recipientId === userId);
   const outgoingRequests = requests.filter(r => r.requesterId === userId);
@@ -18,8 +22,30 @@ export default function SwapRequestsList({ requests = [], userId, onStatusUpdate
 
   const handleAction = async (requestId, status) => {
     setLoadingId(requestId);
+    const targetReq = requests.find(r => r.id === requestId);
     try {
       await onStatusUpdate(requestId, status);
+      if (status === 'completed') {
+        if (addXP) addXP(50, 'Completed Skill Swap Task');
+        if (addNotification) {
+          addNotification({
+            type: 'task',
+            title: '🎉 Skill Swap Completed!',
+            message: `Congratulations! Your exchange with ${targetReq?.recipientName || targetReq?.requesterName || 'Partner'} is complete!`,
+            xp: 50
+          });
+        }
+      } else if (status === 'accepted') {
+        if (addXP) addXP(25, 'Accepted Skill Swap Proposal');
+        if (showToast) {
+          showToast({
+            type: 'success',
+            title: '✨ Proposal Accepted!',
+            message: `Exchange active! You can now start messaging or video calling.`,
+            xp: 25
+          });
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {

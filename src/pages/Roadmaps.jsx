@@ -5,6 +5,7 @@ import {
   Map, Sparkles, CheckCircle, Circle, ArrowRight, Loader, Download,
   Trash2, ChevronDown, ChevronUp, BookOpen, Clock, Target, BarChart2
 } from 'lucide-react';
+import { useNotifications } from '../context/NotificationContext';
 import Button from '../components/Button';
 import './Roadmaps.css';
 
@@ -24,7 +25,8 @@ function saveToStorage(roadmaps) {
 }
 
 export default function Roadmaps() {
-  const { user } = useAuth();
+  const { user, addXP } = useAuth();
+  const { showToast, addNotification } = useNotifications();
   const [skillInput, setSkillInput] = useState('');
   const [levelInput, setLevelInput] = useState('Beginner');
   const [loading, setLoading] = useState(false);
@@ -65,15 +67,39 @@ export default function Roadmaps() {
 
   const toggleTask = (weekIndex, taskId) => {
     if (!roadmap) return;
+    let taskName = '';
+    let isNowDone = false;
+
     const newWeeks = roadmap.weeks.map((week, wi) => {
       if (wi !== weekIndex) return week;
       return {
         ...week,
-        tasks: week.tasks.map(t => t.id === taskId ? { ...t, done: !t.done } : t)
+        tasks: week.tasks.map(t => {
+          if (t.id === taskId) {
+            taskName = t.text;
+            isNowDone = !t.done;
+            return { ...t, done: !t.done };
+          }
+          return t;
+        })
       };
     });
     const updated = { ...roadmap, weeks: newWeeks };
     setRoadmap(updated);
+    
+    // Live notification & XP bonus on task completion
+    if (isNowDone) {
+      if (addXP) addXP(15, `Completed task: ${taskName}`);
+      if (showToast) {
+        showToast({
+          type: 'task',
+          title: '✅ Learning Task Completed!',
+          message: taskName.length > 50 ? taskName.substring(0, 50) + '...' : taskName,
+          xp: 15
+        });
+      }
+    }
+
     // If it's already saved, update in storage too
     if (roadmap._saved) {
       setSavedRoadmaps(prev => prev.map(r => r.id === roadmap.id ? updated : r));

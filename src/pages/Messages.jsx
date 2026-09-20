@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Send, ArrowLeft, User, Phone, Video, MessageCircle, Paperclip, Smile, Sparkles } from 'lucide-react';
+import {
+  Send, ArrowLeft, User, Phone, Video, MessageCircle, Paperclip, Smile,
+  Sparkles, PhoneIncoming, PhoneOutgoing, PhoneMissed, Clock, CheckCircle2
+} from 'lucide-react';
 import axios from 'axios';
 import SessionNotetakerModal from '../components/SessionNotetakerModal';
 import './Messages.css';
@@ -16,11 +19,15 @@ export default function Messages() {
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
   const chatInputRef = useRef(null);
-  const fileInputRef = useRef(null); // Ref for file attachment
+  const fileInputRef = useRef(null);
   const emojiPickerRef = useRef(null);
+
+  const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'calls'
   const [conversations, setConversations] = useState([]);
   const [activeChatId, setActiveChatId] = useState(userId || null);
   const [messages, setMessages] = useState([]);
+  const [callHistory, setCallHistory] = useState([]);
+  const [userCallHistory, setUserCallHistory] = useState([]); // All calls for user
   const [newMessage, setNewMessage] = useState('');
   const [otherUser, setOtherUser] = useState(null);
   const [showNotetakerModal, setShowNotetakerModal] = useState(false);
@@ -32,62 +39,83 @@ export default function Messages() {
     }
   }, [userId]);
 
-  // Initial Data Load
   const [isTyping, setIsTyping] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState(new Set()); // Mock online support
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const typingTimeoutRef = useRef(null);
 
+  // Helper to format call durations
+  const formatDuration = (seconds) => {
+    if (!seconds || seconds <= 0) return '0s';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (mins === 0) return `${secs}s`;
+    return `${mins}m ${secs}s`;
+  };
+
   // Initial Data Load
-  useEffect(() => {
+  const fetchAllData = async () => {
     if (!user) return;
+    try {
+      const [usersRes, messagesRes, userCallsRes] = await Promise.all([
+        axios.get(`${API_URL}/users`),
+        axios.get(`${API_URL}/messages/${user.id}`),
+        axios.get(`${API_URL}/calls/history/${user.id}`).catch(() => ({ data: [] }))
+      ]);
+      
+      const allUsers = usersRes.data || [];
+      const allMessages = messagesRes.data || [];
+      const allUserCalls = userCallsRes.data || [];
+      setUserCallHistory(allUserCalls);
 
-    const fetchData = async () => {
-      try {
-        const [usersRes, messagesRes] = await Promise.all([
-          axios.get(`${API_URL}/users`),
-          axios.get(`${API_URL}/messages/${user.id}`)
-        ]);
+      const interactedUserIds = new Set();
+      allMessages.forEach(msg => {
+        if (msg.senderId === user.id) interactedUserIds.add(msg.receiverId);
+        if (msg.receiverId === user.id) interactedUserIds.add(msg.senderId);
+      });
+      allUserCalls.forEach(call => {
+        if (call.callerId === user.id) interactedUserIds.add(call.receiverId);
+        if (call.receiverId === user.id) interactedUserIds.add(call.callerId);
+      });
+
+      if (activeChatId) interactedUserIds.add(activeChatId);
+
+      const activeConversations = Array.from(interactedUserIds)
+        .map(id => allUsers.find(u => u.id === id))
+        .filter(Boolean);
         
-        const allUsers = usersRes.data;
-        const allMessages = messagesRes.data;
+      setConversations(activeConversations);
 
-        const interactedUserIds = new Set();
-        allMessages.forEach(msg => {
-          if (msg.senderId === user.id) interactedUserIds.add(msg.receiverId);
-          if (msg.receiverId === user.id) interactedUserIds.add(msg.senderId);
-        });
+      const mockOnline = new Set(activeConversations.filter(() => Math.random() > 0.5).map(u => u.id));
+      setOnlineUsers(mockOnline);
 
-        if (activeChatId) interactedUserIds.add(activeChatId);
+      if (activeChatId) {
+        const targetUser = allUsers.find(u => u.id === activeChatId);
+        setOtherUser(targetUser);
 
-        const activeConversations = Array.from(interactedUserIds)
-          .map(id => allUsers.find(u => u.id === id))
-          .filter(Boolean);
-          
-        setConversations(activeConversations);
+        const chatHistory = allMessages.filter(
+          msg => (msg.senderId === user.id && msg.receiverId === activeChatId) || 
+                 (msg.senderId === activeChatId && msg.receiverId === user.id)
+        ).sort((a, b) => a.timestamp - b.timestamp);
+        
+        setMessages(chatHistory);
 
-        // Mock 50% online users for display purposes
-        const mockOnline = new Set(activeConversations.filter(() => Math.random() > 0.5).map(u => u.id));
-        setOnlineUsers(mockOnline);
-
-        if (activeChatId) {
-          const targetUser = allUsers.find(u => u.id === activeChatId);
-          setOtherUser(targetUser);
-
-          const chatHistory = allMessages.filter(
-            msg => (msg.senderId === user.id && msg.receiverId === activeChatId) || 
-                   (msg.senderId === activeChatId && msg.receiverId === user.id)
-          ).sort((a, b) => a.timestamp - b.timestamp);
-          
-          setMessages(chatHistory);
+        // Fetch direct call history between current user and partner
+        try {
+          const directCallsRes = await axios.get(`${API_URL}/calls/history/${user.id}/${activeChatId}`);
+          setCallHistory(directCallsRes.data || []);
+        } catch {
+          setCallHistory([]);
         }
-      } catch (err) {
-        console.error("Failed to fetch messages data", err);
       }
-    };
+    } catch (err) {
+      console.error("Failed to fetch messages data", err);
+    }
+  };
 
-    fetchData();
+  useEffect(() => {
+    fetchAllData();
   }, [user, activeChatId]);
 
   // Handle Real-time Socket Events
@@ -96,19 +124,32 @@ export default function Messages() {
 
     const handleReceiveMessage = (msg) => {
       if (msg.senderId === activeChatId || msg.receiverId === activeChatId) {
-        setMessages(prev => [...prev, msg]);
-        if (msg.senderId === activeChatId) setIsTyping(false); // Clear typing indicator
+        setMessages(prev => {
+          if (prev.some(m => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+        if (msg.senderId === activeChatId) setIsTyping(false);
       }
       
       setConversations(prev => {
         if (!prev.find(c => c.id === msg.senderId)) {
           axios.get(`${API_URL}/users`).then(res => {
              const sender = res.data.find(u => u.id === msg.senderId);
-             if(sender) setConversations(old => [...old, sender]);
+             if (sender) setConversations(old => [...old, sender]);
           });
         }
         return prev;
       });
+    };
+
+    const handleCallHistoryUpdate = (callRecord) => {
+      setUserCallHistory(prev => [callRecord, ...prev.filter(c => c.id !== callRecord.id)]);
+      if (
+        (callRecord.callerId === activeChatId && callRecord.receiverId === user?.id) ||
+        (callRecord.callerId === user?.id && callRecord.receiverId === activeChatId)
+      ) {
+        setCallHistory(prev => [...prev.filter(c => c.id !== callRecord.id), callRecord]);
+      }
     };
     
     const handleTyping = (data) => {
@@ -121,10 +162,10 @@ export default function Messages() {
 
     socket.on('receive_message', handleReceiveMessage);
     socket.on('message_sent', handleReceiveMessage);
+    socket.on('call_history_updated', handleCallHistoryUpdate);
     socket.on('typing', handleTyping);
     socket.on('stop_typing', handleStopTyping);
 
-    // Close emoji picker when clicking outside
     const handleClickOutside = (event) => {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
         setShowEmojiPicker(false);
@@ -135,16 +176,17 @@ export default function Messages() {
     return () => {
       socket.off('receive_message', handleReceiveMessage);
       socket.off('message_sent', handleReceiveMessage);
+      socket.off('call_history_updated', handleCallHistoryUpdate);
       socket.off('typing', handleTyping);
       socket.off('stop_typing', handleStopTyping);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [socket, activeChatId]);
+  }, [socket, activeChatId, user]);
 
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
+  }, [messages, callHistory, isTyping]);
 
   const handleInputChange = (e) => {
     setNewMessage(e.target.value);
@@ -174,7 +216,6 @@ export default function Messages() {
       });
       socket.emit('stop_typing', { senderId: user.id, receiverId: activeChatId });
     } else {
-      // Fallback via REST API when socket is disconnected or in serverless Vercel
       try {
         const res = await axios.post(`${API_URL}/messages`, {
           senderId: user.id,
@@ -198,7 +239,6 @@ export default function Messages() {
     const file = e.target.files[0];
     if (file) {
       setSelectedFile(file);
-      // Automatically add a mention of the file in the text
       setNewMessage(prev => prev + ` [Attached: ${file.name}] `);
     }
   };
@@ -218,65 +258,145 @@ export default function Messages() {
 
     setNewMessage(before + emoji + after);
     
-    // Defer focus and cursor placement
     setTimeout(() => {
       input.focus();
       input.setSelectionRange(start + emoji.length, start + emoji.length);
     }, 0);
   };
 
-  const handleStartVideoCall = () => {
-    navigate(`/call/${activeChatId}`);
-  };
-  
-  const rejectCall = () => {
-    // handled globally by IncomingCallOverlay
+  const handleStartVideoCall = (targetId = activeChatId) => {
+    if (targetId) navigate(`/call/${targetId}`);
   };
 
   const formatTime = (timestamp) => {
     return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Combine messages and call history items chronologically
+  const unifiedTimeline = [
+    ...messages.map(m => ({ ...m, timelineType: 'message' })),
+    ...callHistory.map(c => ({ ...c, timelineType: 'call', timestamp: c.timestamp || new Date(c.startedAt).getTime() }))
+  ].sort((a, b) => a.timestamp - b.timestamp);
+
   return (
     <div className="messages-layout container">
-      {/* Sidebar: Conversations List */}
+      {/* Sidebar: Conversations List & Call History */}
       <div className={`conversations-sidebar glass-panel ${activeChatId ? 'hide-on-mobile' : ''}`}>
         <div className="sidebar-header">
-          <h2>Messages</h2>
+          <h2>Messages &amp; Calls</h2>
+          <div className="messages-tabs-header">
+            <button
+              className={`messages-tab-btn ${activeTab === 'chats' ? 'active' : ''}`}
+              onClick={() => setActiveTab('chats')}
+            >
+              <MessageCircle size={15} /> Chats
+            </button>
+            <button
+              className={`messages-tab-btn ${activeTab === 'calls' ? 'active' : ''}`}
+              onClick={() => setActiveTab('calls')}
+            >
+              <Video size={15} /> Video Calls ({userCallHistory.length})
+            </button>
+          </div>
         </div>
         
-        <div className="conversations-list">
-          {conversations.length === 0 ? (
-            <div className="empty-conversations">
-              <p>No messages yet. Go to Explore to find people!</p>
-            </div>
-          ) : (
-            conversations.map(contact => {
-              const isOnline = onlineUsers.has(contact.id);
-              return (
-                <div 
-                  key={contact.id} 
-                  className={`conversation-item ${activeChatId === contact.id ? 'active' : ''}`}
-                  onClick={() => {
-                    setActiveChatId(contact.id);
-                    navigate(`/messages/${contact.id}`, { replace: true });
-                  }}
-                >
-                  <div className="contact-avatar-wrapper">
-                    <div className="contact-avatar">
-                      <User size={20} />
+        {activeTab === 'chats' ? (
+          <div className="conversations-list">
+            {conversations.length === 0 ? (
+              <div className="empty-conversations">
+                <p>No messages yet. Go to Explore or Matchmaking to connect with peers!</p>
+              </div>
+            ) : (
+              conversations.map(contact => {
+                const isOnline = onlineUsers.has(contact.id);
+                return (
+                  <div 
+                    key={contact.id} 
+                    className={`conversation-item ${activeChatId === contact.id ? 'active' : ''}`}
+                    onClick={() => {
+                      setActiveChatId(contact.id);
+                      navigate(`/messages/${contact.id}`, { replace: true });
+                    }}
+                  >
+                    <div className="contact-avatar-wrapper">
+                      <div className="contact-avatar">
+                        <User size={20} />
+                      </div>
+                      {isOnline && <div className="online-indicator"></div>}
                     </div>
-                    {isOnline && <div className="online-indicator"></div>}
+                    <div className="contact-info">
+                      <h4>{contact.name}</h4>
+                      {isOnline && <div className="contact-preview">Online Now</div>}
+                    </div>
                   </div>
-                  <div className="contact-info">
-                    <h4>{contact.name}</h4>
-                    {isOnline && <div className="contact-preview">Online</div>}
+                );
+              })
+            )}
+          </div>
+        ) : (
+          /* Video Call History List */
+          <div className="call-history-list">
+            {userCallHistory.length === 0 ? (
+              <div className="empty-conversations">
+                <Video size={36} className="text-muted mb-2" style={{ opacity: 0.5 }} />
+                <p>No video call history yet.</p>
+                <p className="text-xs text-muted mt-1">Start a video call with any partner to collaborate live.</p>
+              </div>
+            ) : (
+              userCallHistory.map(call => {
+                const isOutgoing = call.callerId === user?.id;
+                const partnerName = isOutgoing ? (call.receiverName || 'Partner') : (call.callerName || 'Partner');
+                const partnerId = isOutgoing ? call.receiverId : call.callerId;
+                const isCompleted = call.status === 'completed';
+                const isMissed = call.status === 'missed' || call.status === 'rejected';
+
+                return (
+                  <div 
+                    key={call.id || call._id} 
+                    className="call-history-item"
+                    onClick={() => {
+                      setActiveChatId(partnerId);
+                      navigate(`/messages/${partnerId}`, { replace: true });
+                    }}
+                  >
+                    <div className="call-history-left">
+                      <div className={`call-type-icon ${isCompleted ? 'completed' : isMissed ? 'missed' : 'ended'}`}>
+                        {isCompleted ? (
+                          isOutgoing ? <PhoneOutgoing size={17} /> : <PhoneIncoming size={17} />
+                        ) : (
+                          <PhoneMissed size={17} />
+                        )}
+                      </div>
+                      <div className="call-history-info">
+                        <h5>{partnerName}</h5>
+                        <div className="call-history-meta">
+                          <span>{new Date(call.startedAt || call.timestamp).toLocaleDateString()}</span>
+                          <span>&middot;</span>
+                          {isCompleted ? (
+                            <span className="call-duration-badge">{formatDuration(call.duration)}</span>
+                          ) : (
+                            <span style={{ color: '#ef4444' }}>Missed</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button 
+                      className="call-back-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleStartVideoCall(partnerId);
+                      }}
+                      title="Video Call"
+                    >
+                      <Video size={14} /> Call
+                    </button>
                   </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
 
       {/* Main Chat Area */}
@@ -284,8 +404,8 @@ export default function Messages() {
         {!activeChatId ? (
           <div className="empty-chat-state">
             <MessageCircle size={56} className="empty-icon" />
-            <h3>Your Messages</h3>
-            <p>Select a conversation to start chatting.</p>
+            <h3>Your Messages &amp; Video Sessions</h3>
+            <p>Select a conversation from the sidebar or click Call History to inspect previous sessions.</p>
           </div>
         ) : (
           <>
@@ -326,26 +446,69 @@ export default function Messages() {
                 >
                   <Sparkles size={16} /> AI Recap
                 </button>
-                <button className="icon-btn text-brand" onClick={handleStartVideoCall} title="Start Video Call">
-                  <Video size={20} />
+                <button 
+                  className="icon-btn text-brand" 
+                  onClick={() => handleStartVideoCall(activeChatId)} 
+                  title="Start Video Call"
+                  style={{ background: 'rgba(31, 122, 90, 0.15)', border: '1px solid rgba(31, 122, 90, 0.3)', borderRadius: '8px', padding: '0.4rem 0.6rem', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', fontWeight: '600' }}
+                >
+                  <Video size={18} /> Video Call
                 </button>
               </div>
             </div>
 
+            {/* Chat & Call Timeline */}
             <div className="chat-history">
-              {messages.length === 0 ? (
+              {unifiedTimeline.length === 0 ? (
                 <div className="chat-start-message">
-                  <p>Send a message to start the conversation!</p>
+                  <p>Send a message or start a video call to begin exchanging skills!</p>
                 </div>
               ) : (
-                messages.map(msg => {
-                  const isMe = msg.senderId === user.id;
-                  return (
-                    <div key={msg.id} className={`message-wrapper ${isMe ? 'message-mine' : 'message-theirs'}`}>
-                      <div className="message-bubble">
-                        <p>{msg.text}</p>
+                unifiedTimeline.map((item) => {
+                  if (item.timelineType === 'call') {
+                    const isOutgoing = item.callerId === user.id;
+                    const isCompleted = item.status === 'completed';
+                    const isMissed = item.status === 'missed' || item.status === 'rejected';
+
+                    return (
+                      <div 
+                        key={`call-${item.id || item._id}`} 
+                        className={`inline-call-bubble ${isCompleted ? 'status-completed' : isMissed ? 'status-missed' : 'status-ended'}`}
+                      >
+                        <div className="inline-call-content">
+                          <div className={`call-type-icon ${isCompleted ? 'completed' : isMissed ? 'missed' : 'ended'}`}>
+                            {isCompleted ? <Video size={18} /> : <PhoneMissed size={18} />}
+                          </div>
+                          <div>
+                            <h5 className="inline-call-title">
+                              {isCompleted ? 'Video Call Completed' : isMissed ? (isOutgoing ? 'Unanswered Video Call' : 'Missed Video Call') : 'Video Call Ended'}
+                            </h5>
+                            <p className="inline-call-subtitle">
+                              {isCompleted && `Duration: ${formatDuration(item.duration)} • `}
+                              {new Date(item.startedAt || item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="inline-call-actions">
+                          <button 
+                            className="call-back-btn" 
+                            onClick={() => handleStartVideoCall(activeChatId)}
+                          >
+                            <Video size={14} /> Call Again
+                          </button>
+                        </div>
                       </div>
-                      <span className="message-time">{formatTime(msg.timestamp)}</span>
+                    );
+                  }
+
+                  const isMe = item.senderId === user.id;
+                  return (
+                    <div key={item.id} className={`message-wrapper ${isMe ? 'message-mine' : 'message-theirs'}`}>
+                      <div className="message-bubble">
+                        <p>{item.text}</p>
+                      </div>
+                      <span className="message-time">{formatTime(item.timestamp)}</span>
                     </div>
                   );
                 })

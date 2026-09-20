@@ -486,7 +486,194 @@
     gap: 0.25rem;
   }
 
-  .icon-btn {
-    padding: 0.45rem;
-  }
+/* --- VIDEO CALL HISTORY STYLES --- */
+.messages-tabs-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  padding: 0.25rem;
+  background: #E2E8F0;
+  border-radius: var(--radius-md);
 }
+
+.messages-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.messages-tab-btn:hover {
+  color: #0f172a;
+}
+
+.messages-tab-btn.active {
+  background: #FFFFFF;
+  color: #1f7a5a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.call-history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.call-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.call-history-item:hover {
+  border-color: rgba(31, 122, 90, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.call-history-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.call-type-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.call-type-icon.completed {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.call-type-icon.missed {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.call-type-icon.ended {
+  background: rgba(99, 102, 241, 0.15);
+  color: #6366f1;
+}
+
+.call-history-info h5 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.call-history-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+}
+
+.call-duration-badge {
+  font-weight: 600;
+  color: #10b981;
+}
+
+.call-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  background: rgba(31, 122, 90, 0.1);
+  color: #1f7a5a;
+  border: 1px solid rgba(31, 122, 90, 0.2);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.call-back-btn:hover {
+  background: #1f7a5a;
+  color: #FFFFFF;
+}
+
+/* Inline Chat Timeline Call Log Bubble */
+.inline-call-bubble {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.25rem;
+  border-radius: 16px;
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  max-width: 85%;
+  margin: 0.35rem auto;
+  width: fit-content;
+}
+
+.inline-call-bubble.status-completed {
+  border-left: 4px solid #10b981;
+}
+
+.inline-call-bubble.status-missed {
+  border-left: 4px solid #ef4444;
+}
+
+.inline-call-bubble.status-ended {
+  border-left: 4px solid #6366f1;
+}
+
+.inline-call-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.inline-call-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.inline-call-subtitle {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin: 0.15rem 0 0;
+}
+
+.inline-call-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
