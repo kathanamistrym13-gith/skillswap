@@ -396,6 +396,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.mobile-toggle:hover {
+  background: #F1F5F9;
 }
 
 .mobile-menu {
@@ -403,44 +411,65 @@
   top: 100%;
   left: 0;
   right: 0;
-  padding: 1rem;
+  padding: 1.25rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  background: #FFFFFF;
+  gap: 0.35rem;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--border-glass);
-  box-shadow: var(--shadow-lg);
+  border-bottom: 1px solid var(--border-glass);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+  max-height: calc(100vh - 5rem);
+  overflow-y: auto;
+  animation: mobileMenuSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes mobileMenuSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .mobile-nav-link {
-  padding: 1rem;
+  padding: 0.75rem 1rem;
   border-radius: var(--radius-md);
   color: var(--text-secondary);
-  font-weight: 500;
-  text-align: center;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all var(--transition-fast);
 }
 
-.mobile-nav-link:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-primary);
+.mobile-nav-link:hover, .mobile-nav-link:active {
+  background: rgba(31, 122, 90, 0.08);
+  color: var(--brand-primary);
 }
 
 .mobile-user-greeting {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 1rem;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
   color: var(--text-primary);
-  font-weight: 500;
+  font-weight: 700;
   border-bottom: 1px solid var(--border-glass);
   margin-bottom: 0.5rem;
   width: 100%;
-  background: transparent;
+  background: #F8FAFC;
   border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 0.95rem;
+  text-align: left;
 }
 
 .text-error {
@@ -451,7 +480,7 @@
   color: var(--brand-primary) !important;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .desktop-only {
     display: none;
   }
